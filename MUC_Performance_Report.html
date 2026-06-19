@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MUC Performance</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --dk:#101F44;--md:#2E3B6B;--sky:#67CAE1;--lt:#E2F0F5;--coral:#EE577D;
+  --bg:#f2f2f7;--card:#ffffff;--card2:rgba(255,255,255,0.72);
+  --sep:rgba(60,60,67,0.1);--sep2:rgba(60,60,67,0.06);
+  --label:rgba(60,60,67,0.55);--text:#1c1c1e;
+  --green:#34c759;--amber:#ff9500;--red:#ff3b30;--blue:#007aff;
+  --shadow:0 2px 20px rgba(0,0,0,0.06);--shadow2:0 8px 32px rgba(0,0,0,0.08);
+  --r:18px;--rm:14px;--rs:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;min-height:100vh}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;background:var(--dk);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s ease}
+#loader.out{opacity:0;pointer-events:none}
+.ldr-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--sky) 0%,rgba(103,202,225,0.6) 100%);border-radius:14px;display:flex;align-items:center;justify-content:center}
+.ldr-icon svg{width:26px;height:26px;fill:var(--dk)}
+.ldr-title{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.3px}
+.ldr-sub{font-size:13px;color:rgba(255,255,255,0.4);font-weight:400}
+.ldr-bar{width:120px;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden}
+.ldr-bar::after{content:'';display:block;height:100%;width:40%;background:var(--sky);border-radius:2px;animation:barslide 1.1s ease-in-out infinite}
+@keyframes barslide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── NAV ── */
+.nav{position:sticky;top:0;z-index:400;background:rgba(242,242,247,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:0.5px solid var(--sep)}
+.nav-i{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:52px;padding:0 24px;gap:0}
+.nav-logo{display:flex;align-items:center;gap:8px;margin-right:24px;flex-shrink:0}
+.nav-logo-icon{width:24px;height:24px;background:var(--dk);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.nav-logo-icon svg{width:12px;height:12px;fill:#fff}
+.nav-logo-text{font-size:13px;font-weight:700;color:var(--dk);letter-spacing:-.2px}
+.nav-links{display:flex;flex:1;overflow-x:auto;scrollbar-width:none;gap:0}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-a{font-size:13px;font-weight:500;color:var(--label);padding:0 12px;height:52px;display:flex;align-items:center;border:none;background:none;cursor:pointer;white-space:nowrap;transition:color .15s;letter-spacing:-.1px}
+.nav-a:hover{color:var(--text)}
+.nav-a.on{color:var(--dk);font-weight:600}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:12px;flex-shrink:0}
+.nav-chip{font-size:12px;font-weight:600;color:var(--dk);background:var(--lt);border:none;padding:5px 12px;border-radius:20px;cursor:pointer;transition:background .15s;letter-spacing:-.1px}
+.nav-chip:hover{background:rgba(103,202,225,0.25)}
+.nav-per{font-size:12px;color:var(--label);font-weight:500}
+
+/* ── PERIOD BAR ── */
+.pbar{background:rgba(255,255,255,0.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:0.5px solid var(--sep);position:sticky;top:52px;z-index:399;overflow-x:auto;scrollbar-width:none}
+.pbar::-webkit-scrollbar{display:none}
+.pbar-i{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;padding:0 24px;gap:10px}
+.pbar-lbl{font-size:10px;font-weight:700;color:var(--label);letter-spacing:.08em;margin-right:2px;flex-shrink:0;text-transform:uppercase}
+/* Period pills — sit inside a pill-group track */
+.pp-group{display:flex;background:rgba(120,120,128,0.1);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
+.pp{font-size:12px;font-weight:500;color:var(--label);padding:5px 11px;border-radius:7px;border:none;background:none;cursor:pointer;transition:all .18s;white-space:nowrap;letter-spacing:-.1px;line-height:1}
+.pp:hover{color:var(--text)}
+.pp.on{background:#fff;color:var(--dk);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,0.12),0 0 0 0.5px rgba(0,0,0,0.04)}
+.pp.dim{opacity:.28;pointer-events:none}
+.pbar-div{width:0.5px;height:20px;background:var(--sep);flex-shrink:0}
+/* Week pills — individual coloured pills */
+.pw-group{display:flex;gap:5px;align-items:center;flex-shrink:0}
+.pw{font-size:12px;font-weight:500;color:var(--label);padding:5px 12px;border-radius:20px;border:1px solid transparent;background:none;cursor:pointer;transition:all .18s;white-space:nowrap;letter-spacing:-.1px;line-height:1}
+.pw:hover{background:rgba(103,202,225,0.12);color:var(--dk);border-color:rgba(103,202,225,0.3)}
+.pw.on{background:var(--sky);color:var(--dk);font-weight:700;border-color:var(--sky);box-shadow:0 2px 8px rgba(103,202,225,0.35)}
+.pw.dim{opacity:.22;pointer-events:none}
+.pbar-we{font-size:11px;color:var(--label);margin-left:2px;flex-shrink:0;white-space:nowrap;background:rgba(120,120,128,0.08);padding:4px 9px;border-radius:6px}
+
+/* ── ERROR ── */
+.err{background:rgba(255,59,48,0.08);border-bottom:0.5px solid rgba(255,59,48,0.2);padding:10px 24px;display:none}
+.err-i{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.err-msg{font-size:13px;color:#c0392b;font-weight:500;flex:1}
+.err-btn{font-size:13px;font-weight:600;color:var(--blue);background:none;border:none;cursor:pointer;padding:0 4px}
+.err-lbl{font-size:13px;font-weight:500;color:var(--label);cursor:pointer}
+#fi,#fi2{display:none}
+
+/* ── MAIN ── */
+.main{max-width:1200px;margin:0 auto;padding:28px 24px 60px}
+
+/* ── HERO CARD ── */
+.hero-card{background:var(--dk);border-radius:var(--r);padding:32px;margin-bottom:20px;position:relative;overflow:hidden}
+.hero-card::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;background:rgba(103,202,225,0.08);border-radius:50%}
+.hero-card::after{content:'';position:absolute;bottom:-40px;left:40px;width:160px;height:160px;background:rgba(103,202,225,0.04);border-radius:50%}
+.hero-label{font-size:12px;font-weight:600;color:rgba(103,202,225,0.7);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.hero-title{font-size:28px;font-weight:800;color:#fff;letter-spacing:-.5px;margin-bottom:4px;line-height:1.1}
+.hero-meta{font-size:14px;color:rgba(255,255,255,0.45);font-weight:400;margin-bottom:28px;letter-spacing:-.1px}
+.hero-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.08);border-radius:14px;overflow:hidden}
+.htile{padding:18px 16px;background:rgba(255,255,255,0.05);cursor:pointer;transition:background .15s;position:relative}
+.htile:hover{background:rgba(255,255,255,0.09)}
+.htile-num{font-size:32px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1}
+.htile-lbl{font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);margin-top:6px;letter-spacing:.01em;text-transform:uppercase;line-height:1.3}
+.htile-delta{font-size:12px;font-weight:500;margin-top:6px}
+.du{color:#30d158}.dd{color:var(--coral)}.dn2{color:rgba(255,255,255,0.3)}
+
+/* ── SECTION ── */
+.sec{margin-bottom:32px}
+.sec-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:0 2px;gap:12px}
+.sec-title-wrap{display:flex;align-items:center;gap:10px}
+.sec-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
+.sec-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.sec-detail{font-size:13px;color:var(--label);font-weight:400;background:rgba(120,120,128,0.08);padding:4px 10px;border-radius:6px;white-space:nowrap}
+
+/* ── CARD ── */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.card-pad{padding:20px}
+.card-div{height:0.5px;background:var(--sep2);margin:0 20px}
+
+/* ── STAT ROW ── */
+.stat-grid{display:grid;gap:12px;margin-bottom:12px}
+.stat-grid.g2{grid-template-columns:1fr 1fr}
+.stat-grid.g3{grid-template-columns:repeat(3,1fr)}
+.stat-grid.g4{grid-template-columns:repeat(4,1fr)}
+.stat-card{background:var(--card);border-radius:var(--rm);box-shadow:var(--shadow);padding:18px 16px;position:relative;overflow:hidden}
+.stat-lbl{font-size:11px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.stat-num{font-size:34px;font-weight:800;color:var(--text);letter-spacing:-.5px;line-height:1}
+.stat-delta{font-size:12px;font-weight:500;margin-top:8px}
+.stat-sub{font-size:12px;color:var(--label);margin-top:4px}
+.stat-bar{height:3px;background:var(--sep2);border-radius:2px;margin-top:12px;overflow:hidden}
+.stat-fill{height:100%;border-radius:2px;transition:width .6s ease}
+.stat-dot{position:absolute;top:16px;right:14px;width:9px;height:9px;border-radius:50%}
+.dg{color:var(--green)}.dw{color:var(--amber)}.dr{color:var(--red)}.dm{color:var(--label)}
+.sg{background:var(--green)}.sa{background:var(--amber)}.sr{background:var(--red)}.sq{background:var(--sep)}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi-card{background:var(--card);border-radius:var(--rm);box-shadow:var(--shadow);padding:18px 16px;position:relative;overflow:hidden;cursor:default;transition:transform .15s,box-shadow .15s}
+.kpi-card:hover{transform:translateY(-1px);box-shadow:var(--shadow2)}
+.kpi-top{position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0}
+.kpi-dot{position:absolute;top:16px;right:14px;width:9px;height:9px;border-radius:50%}
+.kpi-lbl{font-size:11px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;padding-right:18px;line-height:1.4}
+.kpi-num{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.4px;line-height:1}
+.kpi-delta{font-size:12px;font-weight:500;margin-top:8px}
+
+/* ── INLINE CHART CARD ── */
+.chart-card{background:var(--card);border-radius:var(--rm);box-shadow:var(--shadow);padding:20px}
+.chart-head{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:-.2px}
+.chart-sub{font-size:13px;color:var(--label);margin-bottom:16px;font-weight:400}
+.leg{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.li{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--label);font-weight:500}
+.ld{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* ── TWO-COL ── */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.two-asym{display:grid;grid-template-columns:260px 1fr;gap:12px;align-items:start}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── SAVINGS BARS ── */
+.sav-row{display:flex;align-items:center;padding:11px 0;border-bottom:0.5px solid var(--sep2)}
+.sav-row:last-child{border-bottom:none}
+.sav-cat{font-size:13px;font-weight:500;color:var(--text);width:90px;flex-shrink:0}
+.sav-track{flex:1;height:5px;background:var(--sep2);margin:0 12px;border-radius:3px;overflow:hidden}
+.sav-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.sav-val{font-size:14px;font-weight:700;color:var(--text);width:72px;text-align:right;flex-shrink:0;letter-spacing:-.2px}
+.sav-neg{color:var(--red)}
+
+/* ── HOURS ── */
+.hrs-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--sep2)}
+.hrs-row:last-child{border-bottom:none}
+.hrs-name{font-size:13px;font-weight:500;color:var(--text);width:110px;flex-shrink:0}
+.hrs-track{flex:1;height:4px;background:var(--sep2);border-radius:2px;position:relative;overflow:hidden}
+.hrs-fill{position:absolute;left:0;top:0;height:100%;border-radius:2px;transition:width .5s ease}
+.hrs-pct{font-size:12px;font-weight:700;width:34px;text-align:right;flex-shrink:0}
+.hrs-detail{font-size:11px;color:var(--label);width:72px;text-align:right;flex-shrink:0}
+
+/* ── LIST ROWS (table alternative) ── */
+.list-row{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:0.5px solid var(--sep2)}
+.list-row:last-child{border-bottom:none}
+.list-tag{font-size:13px;font-weight:700;color:var(--text);min-width:56px;font-family:monospace;letter-spacing:-.2px}
+.list-meta{flex:1;display:flex;flex-wrap:wrap;gap:4px 12px}
+.list-item{font-size:12px;color:var(--label);font-weight:400}
+.list-item strong{color:var(--text);font-weight:600}
+.list-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.badge-ok{background:rgba(52,199,89,0.12);color:var(--green)}
+.badge-ong{background:rgba(255,149,0,0.12);color:var(--amber)}
+
+/* ── INFO TILE ── */
+.info-tile{background:var(--lt);border-radius:var(--rm);padding:18px 16px}
+.info-tile-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--md);margin-bottom:8px}
+.info-tile-num{font-size:36px;font-weight:800;color:var(--dk);letter-spacing:-.5px;line-height:1}
+.info-tile-sub{font-size:13px;color:rgba(16,31,68,0.5);margin-top:5px}
+.info-list{list-style:none;margin-top:10px}
+.info-list li{font-size:13px;color:rgba(16,31,68,0.6);padding:3px 0;display:flex;align-items:center;gap:7px}
+.info-list li::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--sky);flex-shrink:0}
+
+/* ── TREND TABS ── */
+.seg{display:inline-flex;background:rgba(116,116,128,0.12);border-radius:9px;padding:2px;margin-bottom:20px}
+.seg-btn{font-size:13px;font-weight:500;padding:5px 14px;border-radius:7px;border:none;background:none;color:var(--label);cursor:pointer;transition:all .15s}
+.seg-btn.on{background:#fff;color:var(--text);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+
+/* ── STATUS LEGEND ── */
+.status-leg{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding:0 4px}
+.sl{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--label);font-weight:500}
+.sldot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── NO DATA ── */
+.no-data{font-size:13px;color:var(--label);text-align:center;padding:24px 0;font-weight:500}
+
+/* ── REVEAL ── */
+.reveal{opacity:0;transform:translateY(12px);transition:opacity .45s ease,transform .45s ease}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:900px){
+  .hero-tiles,.kpi-grid,.stat-grid.g4,.stat-grid.g3,.three{grid-template-columns:1fr 1fr}
+  .two,.two-asym{grid-template-columns:1fr}
+  .main{padding:16px 16px 48px}
+  .nav-i,.pbar-i{padding:0 16px}
+}
+@media(max-width:540px){
+  .hero-tiles,.kpi-grid,.stat-grid.g4,.stat-grid.g3,.stat-grid.g2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ldr-icon"><svg viewBox="0 0 16 16"><path d="M8 1L1 4.5v7L8 15l7-3.5v-7L8 1z"/></svg></div>
+  <div class="ldr-title">MUC Performance</div>
+  <div class="ldr-bar"></div>
+  <div class="ldr-sub" id="lsub">Loading</div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-i">
+    <div class="nav-logo">
+      <div class="nav-logo-icon"><svg viewBox="0 0 16 16"><path d="M8 1L1 4.5v7L8 15l7-3.5v-7L8 1z"/></svg></div>
+      <div class="nav-logo-text">MUC Performance</div>
+    </div>
+    <div class="nav-links">
+      <button class="nav-a on" onclick="jmp('hero')">Overview</button>
+      <button class="nav-a" onclick="jmp('savings')">Savings</button>
+      <button class="nav-a" onclick="jmp('exec')">Executive</button>
+      <button class="nav-a" onclick="jmp('engines')">Engine Kits</button>
+      <button class="nav-a" onclick="jmp('injectors')">Injectors</button>
+      <button class="nav-a" onclick="jmp('hvac')">HVAC</button>
+      <button class="nav-a" onclick="jmp('workshop')">Workshop</button>
+      <button class="nav-a" onclick="jmp('hours')">Hours</button>
+      <button class="nav-a" onclick="jmp('vans')">Light Vans</button>
+      <button class="nav-a" onclick="jmp('accident')">Accident</button>
+      <button class="nav-a" onclick="jmp('trends')">Trends</button>
+    </div>
+    <div class="nav-right">
+      <div id="navStatus" style="display:none;align-items:center;gap:6px;margin-right:4px">
+        <div id="navDot" style="width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.5s ease-in-out infinite"></div>
+        <span style="font-size:11px;color:var(--label);font-weight:500" id="navUpd"></span>
+      </div>
+      <span class="nav-per" id="navPer"></span>
+      <button class="nav-chip" onclick="loadSP()">↻ Refresh</button>
+      <label class="nav-chip" style="cursor:pointer">Upload<input type="file" id="fi" accept=".xlsx,.xls"></label>
+    </div>
+  </div>
+</nav>
+
+<!-- PERIOD BAR -->
+<div class="pbar">
+  <div class="pbar-i">
+    <span class="pbar-lbl">Period</span>
+    <div class="pp-group" id="pbP"></div>
+    <div class="pbar-div"></div>
+    <div class="pw-group" id="pbW"></div>
+    <span class="pbar-we" id="pbWE"></span>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div class="err" id="errBanner">
+  <div class="err-i">
+    <div class="err-msg">Could not connect to SharePoint. Sign in to your Go Ahead account, then retry.</div>
+    <button class="err-btn" onclick="loadSP()">Retry</button>
+    <label class="err-lbl">Upload Excel<input type="file" id="fi2" accept=".xlsx,.xls"></label>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ═══ HERO ═══ -->
+<div id="hero" class="reveal">
+  <div class="hero-card" style="margin-bottom:20px">
+    <div class="hero-label">Go-Ahead London · Major Unit Centre</div>
+    <div class="hero-title">MUC Performance Report</div>
+    <div class="hero-meta" id="hMeta">—</div>
+    <div class="hero-tiles">
+      <div class="htile" onclick="jmp('engines')">
+        <div class="htile-num" id="h1">—</div>
+        <div class="htile-lbl">Engine Kits</div>
+        <div class="htile-delta" id="h1d"></div>
+      </div>
+      <div class="htile" onclick="jmp('injectors')">
+        <div class="htile-num" id="h2">—</div>
+        <div class="htile-lbl">Injectors Passed</div>
+        <div class="htile-delta" id="h2d"></div>
+      </div>
+      <div class="htile" onclick="jmp('hvac')">
+        <div class="htile-num" id="h3">—</div>
+        <div class="htile-lbl">HVAC Completion</div>
+        <div class="htile-delta" id="h3d"></div>
+      </div>
+      <div class="htile" onclick="jmp('accident')">
+        <div class="htile-num" id="h4">—</div>
+        <div class="htile-lbl">Accident Jobs</div>
+        <div class="htile-delta" id="h4d"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SAVINGS ═══ -->
+<div id="savings" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(103,202,225,0.15)">💰</div>
+      <div class="sec-title">Cost Savings</div>
+    </div>
+    <div class="sec-detail" id="savMeta"></div>
+  </div>
+  <div class="two-asym">
+    <div class="card">
+      <div class="card-pad" style="padding-bottom:14px">
+        <div class="stat-lbl">Total period</div>
+        <div style="font-size:36px;font-weight:800;color:var(--text);letter-spacing:-.5px" id="savTot">—</div>
+      </div>
+      <div class="card-div"></div>
+      <div class="card-pad" style="padding-top:14px;padding-bottom:14px">
+        <div class="stat-lbl">Current week</div>
+        <div style="font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.4px" id="savWk">—</div>
+        <div style="font-size:12px;color:var(--label);margin-top:3px" id="savWkD"></div>
+      </div>
+      <div class="card-div"></div>
+      <div class="card-pad" style="padding-top:14px">
+        <div class="stat-lbl">Avg / week</div>
+        <div style="font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.4px" id="savAvg">—</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">By category</div>
+      <div class="chart-sub">Current week savings breakdown</div>
+      <div id="savBars"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXECUTIVE ═══ -->
+<div id="exec" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(16,31,68,0.08)">📊</div>
+      <div class="sec-title">Executive Dashboard</div>
+    </div>
+  </div>
+  <div class="kpi-grid" id="execGrid"></div>
+  <div class="status-leg">
+    <div class="sl"><div class="sldot sg"></div>On target</div>
+    <div class="sl"><div class="sldot sa"></div>Monitor</div>
+    <div class="sl"><div class="sldot sr"></div>Needs attention</div>
+    <div class="sl"><div class="sldot sq"></div>Info</div>
+  </div>
+</div>
+
+<!-- ═══ ENGINE KITS ═══ -->
+<div id="engines" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(103,202,225,0.15)">⚙️</div>
+      <div class="sec-title">Engine Kits</div>
+    </div>
+    <div class="sec-detail" id="ekDetail"></div>
+  </div>
+  <div class="stat-grid g3" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-lbl">Available</div>
+      <div class="stat-num" id="ekA">—</div>
+      <div class="stat-delta" id="ekAd"></div>
+      <div class="stat-bar"><div class="stat-fill" id="ekAbar" style="background:var(--sky)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Issued</div>
+      <div class="stat-num" id="ekI">—</div>
+      <div class="stat-bar"><div class="stat-fill" id="ekIbar" style="background:var(--coral)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Built</div>
+      <div class="stat-num" id="ekB">—</div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head">Stock by engine type</div>
+    <div class="leg"><div class="li"><div class="ld" style="background:var(--dk)"></div>Available</div><div class="li"><div class="ld" style="background:var(--sky)"></div>Issued</div></div>
+    <div style="position:relative;height:220px"><canvas id="ekChart" role="img" aria-label="Engine kits"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══ INJECTORS ═══ -->
+<div id="injectors" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(52,199,89,0.12)">🔬</div>
+      <div class="sec-title">Injectors</div>
+    </div>
+  </div>
+  <div class="stat-grid g3" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-lbl">Passed</div>
+      <div class="stat-num" id="injP">—</div>
+      <div class="stat-delta" id="injPd"></div>
+      <div class="stat-bar"><div class="stat-fill" id="injPbar" style="background:var(--green)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Failed</div>
+      <div class="stat-num" id="injF">—</div>
+      <div class="stat-delta" id="injFd"></div>
+      <div class="stat-bar"><div class="stat-fill" id="injFbar" style="background:var(--red)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Pass Rate</div>
+      <div class="stat-num" id="injRate">—</div>
+      <div class="stat-sub" id="injRsub"></div>
+      <div class="stat-bar"><div class="stat-fill" id="injRbar" style="background:var(--sky)"></div></div>
+    </div>
+  </div>
+  <div class="two">
+    <div class="chart-card">
+      <div class="chart-head">Pass / fail split</div>
+      <div style="position:relative;height:180px"><canvas id="injDonut" role="img" aria-label="Injector split"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">By injector type</div>
+      <div class="leg"><div class="li"><div class="ld" style="background:var(--sky)"></div>Passed</div><div class="li"><div class="ld" style="background:var(--coral)"></div>Failed</div></div>
+      <div style="position:relative;height:160px"><canvas id="injTypes" role="img" aria-label="Injector types"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HVAC ═══ -->
+<div id="hvac" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(0,122,255,0.1)">❄️</div>
+      <div class="sec-title">HVAC</div>
+    </div>
+  </div>
+  <div class="stat-grid g3" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-lbl">Scheduled</div>
+      <div class="stat-num" id="hvSch">—</div>
+      <div class="stat-sub">Weekly target</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Actual</div>
+      <div class="stat-num" id="hvAct">—</div>
+      <div class="stat-delta" id="hvActD"></div>
+      <div class="stat-bar"><div class="stat-fill" id="hvABar" style="background:var(--sky)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Rolling Completion</div>
+      <div class="stat-num" id="hvRoll">—</div>
+      <div class="stat-bar"><div class="stat-fill" id="hvRBar" style="background:var(--sky)"></div></div>
+    </div>
+  </div>
+  <div class="two">
+    <div class="chart-card">
+      <div class="chart-head">Current week</div>
+      <div style="position:relative;height:180px"><canvas id="hvWk" role="img" aria-label="HVAC week"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">Status vs previous week</div>
+      <div class="leg"><div class="li"><div class="ld" style="background:var(--dk)"></div>Current</div><div class="li"><div class="ld" style="background:var(--lt)"></div>Previous</div></div>
+      <div style="position:relative;height:160px"><canvas id="hvStatus" role="img" aria-label="HVAC status"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WORKSHOP ═══ -->
+<div id="workshop" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(255,149,0,0.12)">🔧</div>
+      <div class="sec-title">Workshop</div>
+    </div>
+  </div>
+  <div class="stat-grid g3" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-lbl">Avg Duration (Wk)</div>
+      <div class="stat-num" id="wsDur">—</div>
+      <div class="stat-delta" id="wsDurD"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Rolling Average</div>
+      <div class="stat-num" id="wsRoll">—</div>
+      <div class="stat-sub">Period benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Active Orders</div>
+      <div class="stat-num" id="wsJobs">—</div>
+      <div class="stat-sub" id="wsJobsD"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-pad" style="padding-bottom:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.04em">Work orders — current period</div>
+    </div>
+    <div id="wsList" class="card-pad" style="padding-top:4px"></div>
+  </div>
+</div>
+
+<!-- ═══ HOURS ═══ -->
+<div id="hours" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(88,86,214,0.1)">🕐</div>
+      <div class="sec-title">Hours Worked</div>
+    </div>
+    <div class="sec-detail">Booked vs paid · % utilisation</div>
+  </div>
+  <div class="two">
+    <div class="chart-card">
+      <div class="chart-head">Workshop engineers</div>
+      <div id="wsHrs"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">Accident centre engineers</div>
+      <div id="acHrs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ VANS ═══ -->
+<div id="vans" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(255,149,0,0.1)">🚐</div>
+      <div class="sec-title">Light Vans · King Pins · Axles</div>
+    </div>
+  </div>
+  <div class="two">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="chart-card">
+        <div class="chart-head">Tyres · Defects · MOTs · Services</div>
+        <div class="leg"><div class="li"><div class="ld" style="background:var(--lt);border:1px solid var(--sky)"></div>Rolling</div><div class="li"><div class="ld" style="background:var(--dk)"></div>Current</div></div>
+        <div style="position:relative;height:180px"><canvas id="lvChart" role="img" aria-label="Light vans"></canvas></div>
+      </div>
+      <div class="info-tile">
+        <div class="info-tile-lbl">VOR Days — Current Week</div>
+        <div class="info-tile-num" id="vorD">—</div>
+        <div class="info-tile-sub" id="vorN"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="chart-card">
+        <div class="chart-head">King pins loaded</div>
+        <div class="leg"><div class="li"><div class="ld" style="background:var(--dk)"></div>New</div><div class="li"><div class="ld" style="background:var(--sky)"></div>Old</div></div>
+        <div style="position:relative;height:180px"><canvas id="kpChart" role="img" aria-label="King pins"></canvas></div>
+      </div>
+      <div class="info-tile">
+        <div class="info-tile-lbl">MUC Summary</div>
+        <div class="info-tile-sub" id="kpN" style="font-size:14px;color:rgba(16,31,68,0.7);margin-bottom:4px"></div>
+        <ul class="info-list" id="kpL"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ACCIDENT ═══ -->
+<div id="accident" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(255,59,48,0.1)">🚨</div>
+      <div class="sec-title">Accident Centre</div>
+    </div>
+  </div>
+  <div class="stat-grid g3" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-lbl">Avg Duration (Wk)</div>
+      <div class="stat-num" id="acDur">—</div>
+      <div class="stat-delta" id="acDurD"></div>
+      <div class="stat-bar"><div class="stat-fill" id="acDurBar" style="background:var(--coral)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Rolling Average</div>
+      <div class="stat-num" id="acRoll">—</div>
+      <div class="stat-sub">Period benchmark</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Active Orders</div>
+      <div class="stat-num" id="acJobs">—</div>
+      <div class="stat-sub" id="acJobsD"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-pad" style="padding-bottom:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.04em">Active work orders</div>
+    </div>
+    <div id="acList" class="card-pad" style="padding-top:4px"></div>
+  </div>
+</div>
+
+<!-- ═══ TRENDS ═══ -->
+<div id="trends" class="sec reveal">
+  <div class="sec-title-row">
+    <div class="sec-title-wrap">
+      <div class="sec-icon" style="background:rgba(103,202,225,0.15)">📈</div>
+      <div class="sec-title">Historical Trends</div>
+    </div>
+  </div>
+  <div class="seg">
+    <button class="seg-btn on" onclick="setTT('kpis',this)">KPIs over time</button>
+    <button class="seg-btn" onclick="setTT('sav',this)">Savings</button>
+  </div>
+  <div id="tKpis">
+    <div class="two" style="margin-bottom:12px">
+      <div class="chart-card"><div class="chart-head">Engine kits available</div><div style="position:relative;height:140px"><canvas id="tEK" role="img" aria-label="EK trend"></canvas></div></div>
+      <div class="chart-card"><div class="chart-head">Injectors passed vs failed</div><div style="position:relative;height:140px"><canvas id="tINJ" role="img" aria-label="INJ trend"></canvas></div></div>
+    </div>
+    <div class="two">
+      <div class="chart-card"><div class="chart-head">HVAC completion %</div><div style="position:relative;height:140px"><canvas id="tHVAC" role="img" aria-label="HVAC trend"></canvas></div></div>
+      <div class="chart-card"><div class="chart-head">Workshop avg duration (days)</div><div style="position:relative;height:140px"><canvas id="tWS" role="img" aria-label="WS trend"></canvas></div></div>
+    </div>
+  </div>
+  <div id="tSav" style="display:none">
+    <div class="chart-card"><div class="chart-head">Weekly savings by category</div><div style="position:relative;height:280px"><canvas id="tSavC" role="img" aria-label="Savings trend"></canvas></div></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<div style="background:var(--card);border-top:0.5px solid var(--sep);padding:16px 24px;margin-top:0">
+  <div style="max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:12px;color:var(--label);font-weight:500">Go-Ahead London · Major Unit Centre · Performance Report</div>
+    <div style="font-size:12px;color:var(--label)" id="footUpd"></div>
+  </div>
+</div>
+
+<script>
+const SP='http://localhost:8765/data/excel';
+let ALL=[],WO={},SEL_P=null,SEL_W=null;
+const CH={};
+const C={dk:'#101F44',md:'#2E3B6B',sky:'#67CAE1',lt:'#E2F0F5',coral:'#EE577D',gn:'#34c759',am:'#ff9500',rd:'#ff3b30',grid:'rgba(60,60,67,0.06)'};
+const SCATS=['HVAC','Engine','Workshop','Light Vans','Electronics','Injectors','King Pins'];
+const SCOL=['#67CAE1','#2E3B6B','#101F44','#4aaecc','#93c5fd','#a5b4fc','#6ee7b7'];
+
+function dc(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
+function s(id,v,html=false){const e=document.getElementById(id);if(!e)return;if(html)e.innerHTML=v;else e.textContent=(v==null||v===''||v===undefined)?'—':String(v);}
+function f(v,d=1){if(v==null||isNaN(parseFloat(v)))return'—';const n=parseFloat(v);return n===0?'0':(Number.isInteger(n)?String(n):n.toFixed(d));}
+function gbp(v){if(v==null||isNaN(parseFloat(v)))return'—';const n=parseFloat(v);if(n===0)return'£0';return(n<0?'-':'')+'£'+Math.abs(n).toLocaleString('en-GB',{maximumFractionDigits:0});}
+function pct(v){if(v==null)return'—';const n=parseFloat(v);return isNaN(n)?'—':Math.round(n*100)+'%';}
+function vs(c2,p){if(c2==null||p==null||isNaN(c2)||isNaN(p))return{str:'',cls:'dm'};const d=c2-p;if(d===0)return{str:'same as prev week',cls:'dm'};return{str:(d>0?'↑ +':'↓ ')+f(Math.abs(d))+' vs prev week',cls:d>0?'dg':'dr'};}
+
+function buildPS(){
+  const pm={};ALL.forEach(w=>{if(!pm[w.period])pm[w.period]=[];const hd=w.ek.avail>0||w.inj.passed>0||w.hvac.actual>0||w.savings.total!==0||w.workshop.avgDur>0;pm[w.period].push({week:w.week,weekEnd:w.weekEnd,hasData:hd});});
+  const pbP=document.getElementById('pbP');pbP.innerHTML='';
+  Object.keys(pm).sort().forEach(p=>{const hA=pm[p].some(w=>w.hasData);const b=document.createElement('button');b.className='pp'+(hA?'':' dim')+(p===SEL_P?' on':'');b.textContent=p;b.onclick=()=>{if(!hA)return;SEL_P=p;const fw=pm[p].find(w=>w.hasData);SEL_W=fw?.week;buildPS();renderAll();};pbP.appendChild(b);});
+  buildWS(pm);
+}
+function buildWS(pm){
+  if(!pm){const p2={};ALL.forEach(w=>{if(!p2[w.period])p2[w.period]=[];const hd=w.ek.avail>0||w.inj.passed>0||w.hvac.actual>0||w.savings.total!==0||w.workshop.avgDur>0;p2[w.period].push({week:w.week,weekEnd:w.weekEnd,hasData:hd});});pm=p2;}
+  const pbW=document.getElementById('pbW');pbW.innerHTML='';
+  if(!SEL_P||!pm[SEL_P])return;
+  pm[SEL_P].forEach(({week,weekEnd,hasData})=>{const b=document.createElement('button');b.className='pw'+(hasData?'':' dim')+(week===SEL_W?' on':'');b.textContent=week.replace('Week ','Wk ');b.onclick=()=>{if(!hasData)return;SEL_W=week;buildWS(pm);renderAll();};pbW.appendChild(b);});
+  const wk=(pm[SEL_P]||[]).find(w=>w.week===SEL_W);s('pbWE',wk?'w/e '+wk.weekEnd:'');
+}
+
+function cur(){return ALL.find(w=>w.period===SEL_P&&w.week===SEL_W)||{};}
+function prev(){const i=ALL.findIndex(w=>w.period===SEL_P&&w.week===SEL_W);return i>0?ALL[i-1]:{};}
+function pwks(){return ALL.filter(w=>w.period===SEL_P);}
+function pTot(){return pwks().reduce((s2,w)=>s2+(w.savings?.total||0),0);}
+function pAvg(){const ws=pwks().filter(w=>w.savings?.total!==0);return ws.length?pTot()/ws.length:0;}
+
+function renderAll(){
+  buildPS();
+  const c=cur(),p=prev();if(!c.period)return;
+  const per=`${c.period.replace('P0','P').replace(/^P(\d)/,'Period $1')}, ${c.week}`;
+  s('hMeta',`${per} · Week ending ${c.weekEnd}`);
+  s('navPer',`${c.period} ${c.week}`);
+  s('footUpd',new Date().toLocaleDateString('en-GB'));
+  rHero(c,p);rSav(c);rExec(c,p);rEK(c,p);rInj(c,p);rHVAC(c,p);rWS(c);rHrs(c);rVans(c);rAC(c);rTrends();
+}
+
+function rHero(c,p){
+  const v1=vs(c.ek?.avail,p.ek?.avail),v2=vs(c.inj?.passed,p.inj?.passed);
+  const hvP=c.hvac?.scheduled>0?Math.round(c.hvac.actual/c.hvac.scheduled*100):0;
+  s('h1',f(c.ek?.avail,0));s('h1d',v1.str);document.getElementById('h1d').className='htile-delta '+(v1.cls==='dg'?'du':v1.cls==='dr'?'dd':'dn2');
+  s('h2',f(c.inj?.passed,0));s('h2d',v2.str);document.getElementById('h2d').className='htile-delta '+(v2.cls==='dg'?'du':v2.cls==='dr'?'dd':'dn2');
+  s('h3',hvP+'%');s('h3d',`${c.hvac?.actual||0} of ${c.hvac?.scheduled||0} scheduled`);document.getElementById('h3d').className='htile-delta dn2';
+  s('h4',f(c.accident?.activeJobs,0));s('h4d',c.accident?.avgDur>0?`avg ${f(c.accident.avgDur)}d`:'');document.getElementById('h4d').className='htile-delta '+(c.accident?.avgDur>15?'dd':'dn2');
+}
+
+function rSav(c){
+  s('savTot',gbp(pTot()));s('savWk',gbp(c.savings?.total||0));s('savWkD',`week ending ${c.weekEnd}`);s('savAvg',gbp(pAvg()));s('savMeta',c.period);
+  const cats=c.savings?.cats||{},maxV=Math.max(...SCATS.map(ct=>Math.abs(cats[ct]||0)),1);
+  document.getElementById('savBars').innerHTML=SCATS.map((ct,i)=>{
+    const v=cats[ct]||0,w=Math.abs(v)/maxV*100;
+    return`<div class="sav-row"><div class="sav-cat">${ct}</div><div class="sav-track"><div class="sav-fill" style="width:${w}%;background:${SCOL[i]}"></div></div><div class="sav-val${v<0?' sav-neg':''}">${gbp(v)}</div></div>`;
+  }).join('');
+}
+
+function rExec(c,p){
+  const hvP=c.hvac?.scheduled>0?Math.round(c.hvac.actual/c.hvac.scheduled*100):0;
+  const kpis=[
+    {lbl:'Engine Kits Available',val:f(c.ek?.avail,0),delta:vs(c.ek?.avail,p.ek?.avail),st:'sa',acc:C.sky},
+    {lbl:'Injectors Passed',val:f(c.inj?.passed,0),delta:vs(c.inj?.passed,p.inj?.passed),st:'sg',acc:C.gn},
+    {lbl:'Injectors Failed',val:f(c.inj?.failed,0),delta:{str:f(c.inj?.failed,0)+' this week',cls:'dm'},st:'sa',acc:C.am},
+    {lbl:'HVAC Completion',val:hvP+'%',delta:{str:`${c.hvac?.actual||0} of ${c.hvac?.scheduled||0}`,cls:'dm'},st:hvP>=80?'sg':hvP>=60?'sa':'sr',acc:C.sky},
+    {lbl:'Workshop Avg Duration',val:c.workshop?.avgDur>0?f(c.workshop.avgDur)+'d':'—',delta:c.workshop?.rollingAvg>0?{str:`rolling ${f(c.workshop.rollingAvg)}d`,cls:'dm'}:{str:'',cls:'dm'},st:c.workshop?.avgDur<=5?'sg':c.workshop?.avgDur<=7?'sa':'sr',acc:C.am},
+    {lbl:'Workshop Active Jobs',val:f(c.workshop?.activeJobs,0),delta:{str:'',cls:'dm'},st:'sq',acc:C.md},
+    {lbl:'Accident Avg Duration',val:c.accident?.avgDur>0?f(c.accident.avgDur)+'d':'—',delta:c.accident?.rollingAvg>0?{str:`rolling ${f(c.accident.rollingAvg)}d`,cls:'dm'}:{str:'',cls:'dm'},st:c.accident?.avgDur>15?'sr':c.accident?.avgDur>9?'sa':'sg',acc:C.coral},
+    {lbl:'Accident Active Jobs',val:f(c.accident?.activeJobs,0),delta:{str:'',cls:'dm'},st:c.accident?.activeJobs>4?'sr':'sa',acc:C.coral},
+  ];
+  document.getElementById('execGrid').innerHTML=kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-top" style="background:${k.acc}"></div>
+      <div class="kpi-dot ${k.st}"></div>
+      <div class="kpi-lbl">${k.lbl}</div>
+      <div class="kpi-num">${k.val}</div>
+      <div class="kpi-delta ${k.delta.cls==='dg'?'dg':k.delta.cls==='dr'?'dr':'dm'}">${k.delta.str}</div>
+    </div>`).join('');
+}
+
+function rEK(c,p){
+  const v=vs(c.ek?.avail,p.ek?.avail);
+  s('ekA',f(c.ek?.avail,0));s('ekI',f(c.ek?.issued,0));s('ekB',f(c.ek?.built,0));
+  s('ekAd',v.str);document.getElementById('ekAd').className='stat-delta '+v.cls;
+  s('ekDetail',`${f(c.ek?.avail,0)} available`);
+  document.getElementById('ekAbar').style.width=Math.min(100,(c.ek?.avail||0)/50*100)+'%';
+  document.getElementById('ekIbar').style.width=Math.min(100,(c.ek?.issued||0)/Math.max(c.ek?.avail||1,1)*100)+'%';
+  const types=(c.ek?.types||[]).filter(t=>t.avail>0||t.issued>0);
+  dc('ekChart');
+  CH.ekChart=new Chart(document.getElementById('ekChart'),{type:'bar',data:{labels:types.map(t=>t.type),datasets:[{label:'Available',data:types.map(t=>t.avail),backgroundColor:C.dk,borderRadius:6},{label:'Issued',data:types.map(t=>t.issued),backgroundColor:C.sky,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:40,color:'rgba(60,60,67,0.45)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{font:{size:10},color:'rgba(60,60,67,0.45)'}}}}});
+}
+
+function rInj(c,p){
+  const ip=c.inj?.passed||0,ifail=c.inj?.failed||0,rate=(ip+ifail)>0?Math.round(ip/(ip+ifail)*100):0;
+  s('injP',f(ip,0));s('injF',f(ifail,0));s('injRate',rate+'%');s('injRsub',`${ip} of ${ip+ifail}`);
+  const pv=vs(ip,p.inj?.passed||0),fv=vs(ifail,p.inj?.failed||0);
+  s('injPd',pv.str);document.getElementById('injPd').className='stat-delta '+pv.cls;
+  s('injFd',fv.str);document.getElementById('injFd').className='stat-delta '+(ifail>(p.inj?.failed||0)?'dr':'dg');
+  document.getElementById('injPbar').style.width=Math.min(100,ip/Math.max(ip+ifail,1)*100)+'%';
+  document.getElementById('injFbar').style.width=Math.min(100,ifail/Math.max(ip+ifail,1)*100)+'%';
+  document.getElementById('injRbar').style.width=rate+'%';
+  dc('injDonut');dc('injTypes');
+  CH.injDonut=new Chart(document.getElementById('injDonut'),{type:'doughnut',data:{labels:['Passed','Failed'],datasets:[{data:[ip,ifail],backgroundColor:[C.sky,C.coral],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'right',labels:{color:'rgba(60,60,67,0.6)',font:{size:11},boxWidth:9,padding:8}}}}});
+  const types=(c.inj?.types||[]).filter(t=>t.passWk>0||t.failWk>0);
+  CH.injTypes=new Chart(document.getElementById('injTypes'),{type:'bar',data:{labels:types.map(t=>t.type),datasets:[{label:'Passed',data:types.map(t=>t.passWk),backgroundColor:C.sky,borderRadius:6},{label:'Failed',data:types.map(t=>t.failWk),backgroundColor:C.coral,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},color:'rgba(60,60,67,0.45)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{font:{size:10},color:'rgba(60,60,67,0.45)'}}}}});
+}
+
+function rHVAC(c,p){
+  const hv=c.hvac||{},ph=p.hvac||{},hvP=hv.scheduled>0?Math.round(hv.actual/hv.scheduled*100):0;
+  s('hvSch',f(hv.scheduled,0));s('hvAct',f(hv.actual,0));s('hvRoll',pct(hv.rollingPct));
+  s('hvActD',hvP+'% of target');document.getElementById('hvActD').className='stat-delta '+(hvP>=80?'dg':hvP>=60?'dw':'dr');
+  document.getElementById('hvABar').style.width=hvP+'%';
+  document.getElementById('hvRBar').style.width=((hv.rollingPct||0)*100)+'%';
+  dc('hvWk');dc('hvStatus');
+  CH.hvWk=new Chart(document.getElementById('hvWk'),{type:'doughnut',data:{labels:['Completed','Remaining'],datasets:[{data:[hv.actual||0,Math.max(0,(hv.scheduled||0)-(hv.actual||0))],backgroundColor:[C.sky,'rgba(60,60,67,0.08)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'66%',plugins:{legend:{position:'right',labels:{color:'rgba(60,60,67,0.5)',font:{size:11},boxWidth:9,padding:8}}}}});
+  CH.hvStatus=new Chart(document.getElementById('hvStatus'),{type:'bar',data:{labels:['Not Rel','Left OK','Arr Faults','Out Sched'],datasets:[{label:'Current',data:[hv.notRel||0,hv.notRelFW||0,hv.arrivFaults||0,hv.outSched||0],backgroundColor:C.dk,borderRadius:6},{label:'Previous',data:[ph.notRel||0,ph.notRelFW||0,ph.arrivFaults||0,ph.outSched||0],backgroundColor:C.lt,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},color:'rgba(60,60,67,0.45)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{font:{size:10},color:'rgba(60,60,67,0.45)'}}}}});
+}
+
+function rWS(c){
+  const ws=c.workshop||{};
+  s('wsDur',ws.avgDur>0?f(ws.avgDur)+'d':'—');s('wsRoll',ws.rollingAvg>0?f(ws.rollingAvg)+'d':'—');s('wsJobs',f(ws.activeJobs,0));
+  const dv=ws.avgDur&&ws.rollingAvg?ws.avgDur-ws.rollingAvg:null;
+  if(dv!=null){s('wsDurD',(dv>0?'↑ +':'↓ ')+f(Math.abs(dv))+'d vs rolling');document.getElementById('wsDurD').className='stat-delta '+(dv>0?'dr':'dg');}
+  const pk=Object.keys(WO).find(k=>k.toLowerCase().replace(/\s/g,'').includes(c.period?.replace('P0','P').toLowerCase().replace(/\s/g,'')));
+  const wso=pk?WO[pk]?.ws||[]:[];
+  const ong=wso.filter(o=>o.status==='Ongoing');if(ong.length)s('wsJobsD',ong.map(o=>o.product).join(', '));
+  document.getElementById('wsList').innerHTML=wso.length?wso.map(o=>`
+    <div class="list-row">
+      <div class="list-tag">${o.product}</div>
+      <div class="list-meta">
+        <span class="list-item"><strong>In</strong> ${o.dateIn}</span>
+        <span class="list-item"><strong>Out</strong> ${o.status==='Ongoing'?'Ongoing':o.dateOut}</span>
+        <span class="list-item"><strong>${o.duration}d</strong> · ${o.bookedHrs}h booked</span>
+      </div>
+      <span class="list-badge ${o.status==='Ongoing'?'badge-ong':'badge-ok'}">${o.status}</span>
+    </div>`).join(''):'<div class="no-data">No work orders logged for this period</div>';
+}
+
+function rHrs(c){
+  function rH(id,engs){
+    if(!engs.length){document.getElementById(id).innerHTML='<div class="no-data">No hours data</div>';return;}
+    const max=Math.max(...engs.map(e=>e.paid),1);
+    document.getElementById(id).innerHTML=engs.map(e=>{
+      const col=e.util>=90?C.gn:e.util>=70?C.am:C.rd;const bw=Math.round(e.booked/max*100);
+      return`<div class="hrs-row"><div class="hrs-name">${e.name}</div><div class="hrs-track"><div class="hrs-fill" style="width:${bw}%;background:${C.dk}"></div></div><div class="hrs-pct" style="color:${col}">${e.util}%</div><div class="hrs-detail">${e.paid}h·${e.booked}h</div></div>`;
+    }).join('');
+  }
+  rH('wsHrs',c.wsEngineers||[]);rH('acHrs',c.acEngineers||[]);
+}
+
+function rVans(c){
+  const lv=c.lv||{};
+  s('vorD',f(lv.vorDays,0));s('vorN',lv.vorDays===0?'No VOR days this week':`Rolling avg: ${f(lv.vorDays)} days`);
+  s('kpN',(lv.kpNew===0&&lv.kpOld===0)?'No king pins loaded this week':`${f(lv.kpNew,0)} new, ${f(lv.kpOld,0)} old`);
+  document.getElementById('kpL').innerHTML=[`${f(lv.kpNew,0)} loaded new (wk)`,`${f(lv.kpOld,0)} loaded old (wk)`,`${f(lv.kpAxle,0)} axle(s) processed`].map(t=>`<li>${t}</li>`).join('');
+  dc('lvChart');dc('kpChart');
+  CH.lvChart=new Chart(document.getElementById('lvChart'),{type:'bar',data:{labels:['Tyres','Defects','MOTs','Services'],datasets:[{label:'Rolling',data:[lv.tyresRoll||0,lv.defectsRoll||0,lv.motsRoll||0,lv.servicesRoll||0],backgroundColor:'rgba(226,240,245,0.8)',borderRadius:6,borderWidth:1,borderColor:C.sky},{label:'Current',data:[lv.tyresCurr||0,lv.defectsCurr||0,lv.motsCurr||0,lv.servicesCurr||0],backgroundColor:C.dk,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'rgba(60,60,67,0.45)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{font:{size:10},color:'rgba(60,60,67,0.45)'}}}}});
+  CH.kpChart=new Chart(document.getElementById('kpChart'),{type:'bar',data:{labels:['Prev Wk','Current Wk'],datasets:[{label:'New',data:[lv.kpNewPrev||0,lv.kpNew||0],backgroundColor:C.dk,borderRadius:6},{label:'Old',data:[lv.kpOldPrev||0,lv.kpOld||0],backgroundColor:C.sky,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'rgba(60,60,67,0.45)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{stepSize:1,font:{size:10},color:'rgba(60,60,67,0.45)'}}}}});
+}
+
+function rAC(c){
+  const ac=c.accident||{};
+  s('acDur',ac.avgDur>0?f(ac.avgDur)+'d':'—');s('acRoll',ac.rollingAvg>0?f(ac.rollingAvg)+'d':'—');s('acJobs',f(ac.activeJobs,0));
+  const dv=ac.avgDur&&ac.rollingAvg?ac.avgDur-ac.rollingAvg:null;
+  if(dv!=null){s('acDurD',(dv>0?'↑ +':'↓ ')+f(Math.abs(dv))+'d vs rolling');document.getElementById('acDurD').className='stat-delta '+(dv>0?'dr':'dg');}
+  document.getElementById('acDurBar').style.width=Math.min(100,(ac.avgDur||0)/30*100)+'%';
+  const pk=Object.keys(WO).find(k=>k.toLowerCase().replace(/\s/g,'').includes(c.period?.replace('P0','P').toLowerCase().replace(/\s/g,'')));
+  const aco=pk?WO[pk]?.ac||[]:[];
+  const ong=aco.filter(o=>o.status==='Ongoing'||o.dateOut==='Ongoing');if(ong.length)s('acJobsD',`${ong.length} ongoing`);
+  document.getElementById('acList').innerHTML=aco.length?aco.map(o=>`
+    <div class="list-row">
+      <div class="list-tag">${o.product}</div>
+      <div class="list-meta">
+        <span class="list-item"><strong>In</strong> ${o.dateIn}</span>
+        <span class="list-item"><strong>${(o.dateOut==='Ongoing'||o.status==='Ongoing')?'Ongoing':o.dateOut}</strong></span>
+        <span class="list-item">${o.duration}d · ${o.bookedHrs}h</span>
+      </div>
+      <span class="list-badge badge-ong">Ongoing</span>
+    </div>`).join(''):'<div class="no-data">No accident centre work orders logged</div>';
+}
+
+function rTrends(){
+  const valid=ALL.filter(w=>w.ek?.avail>0||w.inj?.passed>0||w.hvac?.actual>0||w.workshop?.avgDur>0);if(!valid.length)return;
+  const labels=valid.map(w=>`${w.period} ${w.week.replace('Week ','Wk ')}`);
+  const mo={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,color:'rgba(60,60,67,0.4)'}},y:{beginAtZero:true,grid:{color:C.grid},ticks:{font:{size:9},color:'rgba(60,60,67,0.4)'}}}};
+  dc('tEK');dc('tINJ');dc('tHVAC');dc('tWS');dc('tSavC');
+  CH.tEK=new Chart(document.getElementById('tEK'),{type:'line',data:{labels,datasets:[{data:valid.map(w=>w.ek?.avail||0),borderColor:C.sky,backgroundColor:'rgba(103,202,225,0.08)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:C.dk,borderWidth:2}]},options:mo});
+  CH.tINJ=new Chart(document.getElementById('tINJ'),{type:'line',data:{labels,datasets:[{label:'Passed',data:valid.map(w=>w.inj?.passed||0),borderColor:C.sky,fill:false,tension:.4,pointRadius:2,borderWidth:2},{label:'Failed',data:valid.map(w=>w.inj?.failed||0),borderColor:C.coral,fill:false,tension:.4,pointRadius:2,borderWidth:2}]},options:{...mo,plugins:{legend:{display:true,position:'top',labels:{color:'rgba(60,60,67,0.5)',font:{size:10},boxWidth:9,padding:8}}}}});
+  const hvO={...mo,scales:{...mo.scales,y:{...mo.scales.y,max:100,ticks:{callback:v=>v+'%',font:{size:9},color:'rgba(60,60,67,0.4)'}}}};
+  CH.tHVAC=new Chart(document.getElementById('tHVAC'),{type:'line',data:{labels,datasets:[{data:valid.map(w=>w.hvac?.rollingPct?Math.round(w.hvac.rollingPct*100):w.hvac?.actual&&w.hvac?.scheduled?Math.round(w.hvac.actual/w.hvac.scheduled*100):0),borderColor:C.sky,backgroundColor:'rgba(103,202,225,0.08)',fill:true,tension:.4,pointRadius:3,borderWidth:2}]},options:hvO});
+  CH.tWS=new Chart(document.getElementById('tWS'),{type:'bar',data:{labels,datasets:[{data:valid.map(w=>w.workshop?.avgDur||0),backgroundColor:C.md,borderRadius:5}]},options:mo});
+  const sv=ALL.filter(w=>w.savings?.total!==0);
+  if(sv.length){const sl=sv.map(w=>`${w.period} ${w.week.replace('Week ','Wk ')}`);CH.tSavC=new Chart(document.getElementById('tSavC'),{type:'bar',data:{labels:sl,datasets:SCATS.map((ct,i)=>({label:ct,data:sv.map(w=>Math.max(0,w.savings?.cats?.[ct]||0)),backgroundColor:SCOL[i],borderRadius:4,stack:'s'}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{color:'rgba(60,60,67,0.5)',font:{size:10},boxWidth:9,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,color:'rgba(60,60,67,0.4)'},stacked:true},y:{beginAtZero:true,stacked:true,grid:{color:C.grid},ticks:{callback:v=>'£'+Math.round(v/1000)+'k',font:{size:9},color:'rgba(60,60,67,0.4)'}}}}});}
+}
+
+function setTT(tab,btn){document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');document.getElementById('tKpis').style.display=tab==='kpis'?'block':'none';document.getElementById('tSav').style.display=tab==='sav'?'block':'none';if(tab==='sav')setTimeout(()=>CH.tSavC?.update(),50);}
+function jmp(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});}
+
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.nav-a').forEach(b=>b.classList.remove('on'));const lnk=document.querySelector(`.nav-a[onclick*="'${e.target.id}'"]`);if(lnk)lnk.classList.add('on');}});},{threshold:0.1,rootMargin:'-96px 0px 0px 0px'});
+document.querySelectorAll('[id].sec,[id].reveal').forEach(el=>obs.observe(el));
+const ro=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in');});},{threshold:0.05});
+document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+
+function xlToDate(v){if(v instanceof Date)return v;if(typeof v==='number')return new Date((v-25569)*86400*1000);return null;}
+function getFri(dt){if(!dt)return null;const d=new Date(dt);const days=(5-d.getDay()+7)%7;d.setDate(d.getDate()+days);d.setHours(0,0,0,0);return d;}
+function fmtD(d){if(!d)return'';return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});}
+
+function processWB(wb){
+  console.log('processWB called, sheets:', wb.SheetNames);
+  s('lsub','Parsing data…');
+  const ws=wb.Sheets['Raw Data'];if(!ws){alert('Raw Data sheet not found');return;}
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const HDR=raw[1];const ci=name=>HDR.indexOf(name);
+  ALL=[];
+  for(let i=2;i<raw.length;i++){
+    const row=raw[i];if(!row[0]||!String(row[0]).startsWith('P'))continue;
+    const n=col=>{const v=row[ci(col)];return typeof v==='number'?v:0;};
+    const we=[],ae=[];
+    [['Jade Davis',51,52],['Luke Hubbard',53,54],['Lee Hayward',55,56],['R. Makanga',57,58],['U. Rabbani',59,60],['G. Perry',61,62],['Tom Toll',63,64],['T. Howell',65,66],['A. McMillan',67,68],['L. Billett',69,70]].forEach(([nm,pi,bi])=>{const p=row[pi]||0,b=row[bi]||0;if(p>0||b>0)we.push({name:nm,paid:+p.toFixed(1),booked:+b.toFixed(1),util:p>0?Math.round(b/p*100):0});});
+    [['Ben Evans',71,72],['Jon Egan',73,74],['David Chapman',75,76],['Mark Bonas',77,78],['Ross Stevens',79,80]].forEach(([nm,pi,bi])=>{const p=row[pi]||0,b=row[bi]||0;if(p>0||b>0)ae.push({name:nm,paid:+p.toFixed(1),booked:+b.toFixed(1),util:p>0?Math.round(b/p*100):0});});
+    ALL.push({period:String(row[0]),week:String(row[1]),weekEnd:String(row[2]||''),
+      ek:{avail:n('EK Available'),issued:n('EK Issued'),built:n('EK Built'),types:[{type:'2nd Hand',avail:row[6]||0,issued:row[7]||0},{type:'Volvo E5',avail:row[9]||0,issued:row[10]||0},{type:'Volvo E6',avail:row[11]||0,issued:row[12]||0},{type:'Cummins 6CY E4/5',avail:row[13]||0,issued:row[14]||0},{type:'Cummins 4CY E5',avail:row[15]||0,issued:row[16]||0},{type:'Cummins 4CY E6',avail:row[17]||0,issued:row[18]||0},{type:'Cummins HD E5',avail:row[19]||0,issued:0},{type:'Cummins HD E6',avail:row[20]||0,issued:row[21]||0},{type:'Cummins 6CY HD',avail:row[23]||0,issued:0},{type:'Merc OM934',avail:row[24]||0,issued:row[25]||0},{type:'Merc MEC',avail:row[26]||0,issued:row[27]||0}]},
+      inj:{passed:n('INJ Passed'),failed:n('INJ Failed'),returned:n('INJ Returned'),types:[{type:'E6 SS',passWk:row[31]||0,failWk:row[32]||0},{type:'E6',passWk:row[33]||0,failWk:row[34]||0},{type:'E5',passWk:row[35]||0,failWk:row[36]||0},{type:'OM934-A',passWk:row[37]||0,failWk:row[38]||0},{type:'OM934-B',passWk:row[39]||0,failWk:row[40]||0}]},
+      hvac:{scheduled:n('HVAC Scheduled'),actual:n('HVAC Actual'),notRel:n('HVAC Not Rel'),notRelFW:n('HVAC Not Rel Fully Wkg'),arrivFaults:n('HVAC Arr Faults'),outSched:n('HVAC Outside Sch'),rollingPct:n('HVAC Rolling Comp%')},
+      workshop:{avgDur:n('WS Avg Duration'),activeJobs:n('WS Active Jobs'),rollingAvg:n('WS Rolling Avg')},
+      wsEngineers:we,acEngineers:ae,
+      lv:{tyresCurr:n('LV Tyres Curr'),tyresRoll:n('LV Tyres Roll'),defectsCurr:n('LV Defects Curr'),defectsRoll:n('LV Defects Roll'),motsCurr:n('LV MOTs Curr'),motsRoll:n('LV MOTs Roll'),servicesCurr:n('LV Services Curr'),servicesRoll:n('LV Services Roll'),vorDays:n('LV VOR Days'),kpNew:n('KP Loaded New Wk'),kpOld:n('KP Loaded Old Wk'),kpAxle:n('KP Axle Roll'),kpNewPrev:n('KP Loaded New Prev'),kpOldPrev:n('KP Loaded Old Prev')},
+      accident:{avgDur:n('AC Avg Dur Wk'),rollingAvg:n('AC Avg Dur Roll'),activeJobs:n('AC Active Jobs')},
+      savings:{total:0,cats:{}}});
+  }
+  const wsc=wb.Sheets['Cost Saving Sheet'];
+  if(wsc){const cost=XLSX.utils.sheet_to_json(wsc,{header:1,defval:null,raw:true});const sm={};for(let i=1;i<cost.length;i++){const row=cost[i];if(!row[5]||row[12]==null)continue;try{const cd=xlToDate(row[5]);if(!cd)continue;const fri=getFri(cd);if(!fri)continue;const key=fmtD(fri);if(!sm[key])sm[key]={};const sv=parseFloat(row[12])||0;const job=String(row[7]||'').toUpperCase();const dept=String(row[3]||'').trim().toLowerCase();let cat='Workshop';if(job.includes('HVAC')||job.includes('HEATER')||dept==='hvac')cat='HVAC';else if(job.includes('ENGINE')||job.includes('CRANK')||job.includes('CYLINDER')||dept==='engine')cat='Engine';else if(job.includes('INJECTOR')||dept==='injectors')cat='Injectors';else if(job.includes('KING PIN')||dept.includes('king'))cat='King Pins';else if(job.includes('ELECTRONIC')||dept==='electronics')cat='Electronics';else if(job.includes('TYRE')||job.includes('MOT')||dept.includes('light'))cat='Light Vans';sm[key][cat]=(sm[key][cat]||0)+sv;}catch(e){}}ALL.forEach(wk=>{const sv=sm[wk.weekEnd]||{};wk.savings={total:Object.values(sv).reduce((a,b)=>a+b,0),cats:sv};});}
+  const wswo=wb.Sheets['WO Log'];
+  if(wswo){WO={};const wo=XLSX.utils.sheet_to_json(wswo,{header:1,defval:null,raw:false});for(let i=2;i<wo.length;i++){const row=wo[i];if(!row[0])continue;const per=String(row[9]||'').trim();if(!WO[per])WO[per]={ws:[],ac:[]};const e={product:String(row[1]||''),reqDate:String(row[2]||''),dateIn:String(row[3]||''),dateOut:String(row[4]||''),estHrs:row[5],bookedHrs:row[6],duration:row[7],status:String(row[8]||'')};if(String(row[0]).trim()==='WS')WO[per].ws.push(e);else if(String(row[0]).trim()==='AC')WO[per].ac.push(e);}}
+  const wd=ALL.filter(w=>w.ek.avail>0||w.inj.passed>0||w.hvac.actual>0||w.savings.total!==0||w.workshop.avgDur>0);
+  if(wd.length){const last=wd[wd.length-1];SEL_P=last.period;SEL_W=last.week;}
+  document.getElementById('loader').classList.add('out');
+  // Show live status
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  s('navUpd',`Updated ${timeStr}`);
+  document.getElementById('navStatus').style.display='flex';
+  // Schedule next auto-refresh in 5 minutes
+  clearTimeout(window._refreshTimer);
+  window._refreshTimer=setTimeout(()=>loadSP(true),5*60*1000);
+  buildPS();renderAll();
+  setTimeout(()=>document.querySelectorAll('.reveal').forEach(el=>{const r=el.getBoundingClientRect();if(r.top<window.innerHeight+100)el.classList.add('in');}),200);
+}
+
+async function loadSP(silent=false){
+  if(!silent){document.getElementById('loader').classList.remove('out');document.getElementById('errBanner').style.display='none';s('lsub','Connecting…');}
+  else{const dot=document.getElementById('navDot');if(dot)dot.style.background='var(--amber)';}
+  try{
+    s('lsub','Fetching Excel…');
+    const r=await fetch(SP);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    s('lsub','Downloading…');
+    const ab=await r.arrayBuffer();
+    s('lsub','Parsing spreadsheet…');
+    let wb;
+    try{wb=XLSX.read(ab,{type:'arraybuffer',cellDates:false,raw:true});}
+    catch(parseErr){s('lsub','Parse error — check console');console.error('XLSX parse:',parseErr);throw parseErr;}
+    if(!wb.Sheets['Raw Data']){
+      s('lsub','Raw Data sheet not found — check console');
+      console.error('Available sheets:',wb.SheetNames);
+      throw new Error('Raw Data sheet missing');
+    }
+    processWB(wb);
+  }catch(e){
+    console.error('loadSP failed:',e);
+    if(!silent){document.getElementById('loader').classList.add('out');document.getElementById('errBanner').style.display='block';}
+    else{const dot=document.getElementById('navDot');if(dot)dot.style.background='var(--red)';
+      clearTimeout(window._refreshTimer);window._refreshTimer=setTimeout(()=>loadSP(true),2*60*1000);}
+  }
+}
+[document.getElementById('fi'),document.getElementById('fi2')].forEach(el=>{if(el)el.addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;document.getElementById('loader').classList.remove('out');document.getElementById('errBanner').style.display='none';s('lsub','Reading…');const ab=await file.arrayBuffer();processWB(XLSX.read(ab,{type:'arraybuffer',cellDates:false,raw:true}));});});
+window.addEventListener('load',loadSP);
+</script>
+</body>
+</html>
